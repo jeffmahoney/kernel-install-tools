@@ -1,0 +1,157 @@
+#!/bin/bash
+set -e
+
+progname="$(basename "$0")"
+
+error() {
+    echo "$@" >&2
+    exit 1
+}
+
+quiet_message() {
+    $QUIET || echo "$@"
+}
+
+quiet_error() {
+    quiet_message "$@" >&2
+    exit 1
+}
+
+_usage() {
+cat << END
+$progname [-q|--quiet] [-e|--enroll] <source> <destination> [signing key]
+
+This script will prepare an unsigned kernel for use on a system with
+UEFI Secure Boot enabled.  The kernel located at <source> will be
+signed using the signing key and written to <destination>.  It will then
+register the public component of the signing key for enrollment in the
+system MOK if it is not already enrolled.
+
+If [signing key] is unspecified and the working directory is a kernel
+build directory, the signing key will be pulled from .config.
+
+options:
+    -q|--quiet: do not report errors for missing dependencies, just exit
+    -e|--enroll: queue certificate for enrollment in MOK if not already enrolled
+END
+}
+
+help() {
+    _usage
+    exit 0
+}
+
+usage() {
+    _usage >&2
+    exit 1
+}
+
+check_commands() {
+    for command in "$@"; do
+        if ! command -v "$command" > /dev/null; then
+            if ! $QUIET; then
+                error "$command is missing"
+            else
+                exit 1
+            fi
+        fi
+    done
+}
+
+options=$(getopt -o qhe --long quiet,help,enroll -- "$@")
+
+eval set -- $options
+
+QUIET=false
+ENROLL=false
+while true; do
+    case "$1" in
+    -q|--quiet)
+        QUIET=true
+        ;;
+    -e|--enroll)
+        ENROLL=true
+        ;;
+    -h|--help)
+        help ;;
+    --)
+        shift
+        break ;;
+    *)
+        usage ;;
+    esac
+    shift
+done
+
+check_commands pesign pk12util certutil openssl
+
+UNSIGNED=$1
+SIGNED=$2
+CERT=$3
+
+test -z "$UNSIGNED" -o -z "$SIGNED" && usage 1
+test -f "$UNSIGNED" || error "$UNSIGNED does not exist."
+test -d "$(dirname "$SIGNED")" || error "Target directory for $SIGNED does not exist."
+
+read_cert_config() {
+    sed -n '/^CONFIG_MODULE_SIG_KEY=/s///p' $1 |tr -d '"'
+}
+
+if test -z "$CERT"; then
+    for path in .config "$(dirname "$UNSIGNED")/.config"; do
+        if test -e $path; then
+            CERT=$(read_cert_config $path)
+            if test -n "$CERT"; then
+                break
+            fi
+        fi
+    done
+fi
+
+test -z "$CERT" && quiet_error "Couldn't locate signing key"
+
+cleanup() {
+	test -n "$tmpdir" && rm -rf "$tmpdir"
+}
+
+trap cleanup EXIT
+tmpdir=$(mktemp -d /tmp/signkernel.XXXXXX)
+
+if ! openssl x509 -in $CERT -ext keyUsage,extendedKeyUsage -noout | \
+	grep -q "Code Signing"; then
+    error "Certificate must have Code Signing extended key usage defined for Secure Boot."
+fi
+
+# certutil has no facility to import a private key directly, so we have to
+# use the pkcs12 interface instead.
+certutil_import_key() {
+    local certdir=$1
+    local cert=$2
+    local P12="$tmpdir/cert.p12"
+
+    uuidgen > $tmpdir/passwd
+    openssl pkcs12 -export -password "file:$tmpdir/passwd" -inkey $cert \
+                   -in $cert -name kernel-cert -out $P12
+
+    # pk12util has no silent mode
+    if ! pk12util -w $tmpdir/passwd -d $certdir -i $P12 > $tmpdir/output; then
+        cat $tmpdir/output
+        exit 1
+    fi
+    rm -f $tmpdir/passwd $P12 $tmpdir/output
+}
+
+certutil -N -d $tmpdir --empty-password
+certutil_import_key $tmpdir $CERT
+
+pesign -n $tmpdir -c kernel-cert -i $UNSIGNED -o $SIGNED -s --force
+
+quiet_message "Signed $UNSIGNED with $CERT and installed to $SIGNED"
+
+$ENROLL || exit 0
+
+if $QUIET; then
+    ARGS="-q"
+fi
+
+/sbin/enroll_secureboot_key $ARGS $CERT

@@ -1,0 +1,153 @@
+#!/bin/bash
+set -e
+progname=$(basename "$0")
+
+cleanup() {
+    test -n "$genkey" && rm -f "$genkey"
+}
+
+default_common_name() {
+    name=$(getent passwd $USER|cut -d : -f 5|cut -d, -f 1)
+    if test -z "$name"; then
+        name="$USER"
+    fi
+
+    echo "${name}'s Secure Boot Signkey"
+}
+
+CN=$(default_common_name)
+EMAIL="${USER}@$(hostname -f)"
+HASH=sha256
+
+_usage() {
+cat <<END
+$progname [options ...] /path/to/certificate
+
+options:
+    -h|--help: This message
+    -H|--hash <hash>: Specify which hash to use in the key (default: sha256)
+    -f|--force: Force overwrite of existing certificate and ignore warnings
+                about mismatched hashes.
+    -e|--email: Email address to associate with the key
+        (default: $EMAIL)
+    -c|--common-name: Common Name to associate with the key.
+        (default: $CN)
+END
+}
+
+warn() {
+    echo "$@" 1>&2
+}
+
+error() {
+    warn "$@"
+    exit 1
+}
+
+help() {
+cat <<END
+$progname will generate an x509 key suitable for use in signing kernel
+binaries and modules.  It will also generate a certificate suitable for
+use by UEFI Secure Boot to validate the kernel and modules at boot time.
+
+END
+    _usage
+    exit 0
+}
+
+usage() {
+    _usage 1>&2
+    exit 1
+}
+
+options=$(getopt -o H:hfc:e: --long hash:,help,force,email:,common-name: -- "$@")
+if test $? -ne 0; then
+    usage
+fi
+
+eval set -- $options
+
+FORCE=false
+while true; do
+    case "$1" in
+    -H|--hash)
+        HASH=$2
+        shift ;;
+    -f|--force)
+        FORCE=true
+        ;;
+    -h|--help)
+	help
+	;;
+    -c|--common-name)
+        CN=$2
+        shift
+        ;;
+    -e|--email)
+        EMAIL=$2
+        shift
+        ;;
+    --)
+        shift
+        break ;;
+    *)
+        usage ;;
+    esac
+    shift
+done
+
+if test $# -eq 0; then
+    echo "missing output file"
+    usage
+fi
+
+OUTPUT=$1
+
+if test -e "$OUTPUT" -a "$FORCE" = "false"; then
+    error "$OUTPUT already exists.  Overwrite with --force"
+fi
+
+if test -z "$CN"; then
+    error "Emtpy CN is not valid."
+fi
+
+if test -z "$EMAIL"; then
+    error "Empty email is not valid."
+fi
+
+if test -z "$HASH"; then
+    error "Empty hash is not valid."
+fi
+
+trap cleanup EXIT
+genkey=$(mktemp /tmp/genkey.XXXXXX)
+
+# Notes on key usage:
+# Module signing requries digitalSignature
+# Secure Boot requires codeSigning
+
+cat << END > $genkey
+[ req ]
+default_bits = 2048
+distinguished_name = req_distinguished_name
+prompt = no
+string_mask = utf8only
+x509_extensions = myexts
+
+[ req_distinguished_name ]
+CN = "${CN}"
+emailAddress = "${EMAIL}"
+
+[ myexts ]
+basicConstraints=critical,CA:FALSE
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid
+keyUsage=critical, digitalSignature
+extendedKeyUsage=codeSigning
+END
+
+if ! openssl req -new -nodes -utf8 -"$HASH" -days 36500 -batch -x509 \
+                 -config "$genkey" -outform PEM -out "$OUTPUT" \
+                 -keyout "$OUTPUT"; then
+    error "Failed to generate signing key and certificate."
+fi

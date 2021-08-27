@@ -1,0 +1,66 @@
+#!/bin/bash
+set -e
+
+progname="$(basename "$0")"
+
+error() {
+    echo "$@" >&2
+    exit 1
+}
+
+quiet_message() {
+    $QUIET || echo "$@"
+}
+
+quiet_error() {
+    quiet_message "$@" >&2
+    exit 1
+}
+
+filter_fingerprints() {
+    grep 'SHA1 Fingerprint' | sed -e 's/SHA1 Fingerprint.//' | \
+        tr -d ' :' | tr a-z A-Z
+}
+
+cert_fingerprint() {
+    openssl x509 -inform PEM -fingerprint -noout -in "$1" | filter_fingerprints
+}
+
+enrolled_fingerprints() {
+    mokutil --list-enrolled | filter_fingerprints
+    mokutil --list-new | filter_fingerprints
+}
+
+if "$EUID" != 0; then
+    error "This tool must be run as root."
+fi
+
+fingerprint=$(cert_fingerprint "$CERT")
+fingerprint8=$(echo $fingerprint | cut -b 1-8)
+
+if test -z "$fingerprint8"; then
+    error "Failed to parse fingerprint from $CERT"
+fi
+
+for enrolled in $(enrolled_fingerprints); do
+    if test "$enrolled" = "$fingerprint"; then
+        quiet_message "Signing key $fingerprint8 already enrolled or pending."
+        exit 0
+    fi
+done
+
+if test "$EUID" -ne 0; then
+    error "Root privileges are required to queue $CERT for enrollment on reboot."
+fi
+
+mkdir -p /etc/uefi/certs
+if ! openssl x509 -inform PEM -in "$CERT" -outform DER \
+                  -out "/etc/uefi/certs/$fingerprint8.crt"; then
+    error "Failed to convert ${CERT} to DER format for import."
+fi
+
+if ! mokutil --import "/etc/uefi/certs/$fingerprint8.crt" --root-pw; then
+    error "Failed to queue certificate for enrollment."
+fi
+
+quiet_message "Secure Boot certificate queued for enrollment on reboot."

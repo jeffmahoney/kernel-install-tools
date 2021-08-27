@@ -29,6 +29,23 @@ Typical usage:
 
 	$ sbtool-keygen /path/to/certificate
 
+The only required argument is the path to the certificate.
+
+Unless otherwise specified, the following defaults will be used:
+* Hash: sha256
+* Email: `$USER@$(hostname -f)`
+* Common Name (CN): `$NAME`'s Secure Boot Signkey
+	* `$NAME` is taken from the `getent passwd` output for the current user
+
+The `-f|--force` option can be used to allow overwriting the certificate
+if the file already exists.
+
+The `-H|--hash` option can be used to specify an alternate hash.
+
+The `-e|--email` option can be used to specify a different email address.
+
+The `-c|--common-name` option can be used to specify a different CN.
+
 
 ## sbtool-sign-kernel
 

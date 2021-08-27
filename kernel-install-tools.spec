@@ -20,6 +20,7 @@ Name:           kernel-install-tools
 Version:        0.1
 Release:        0
 Summary:	Useful tools for installing self-built kernels
+Group:		Development/Tools/Other
 License:        GPL-2.0
 URL:            https://github.com/jeffmahoney/kernel-install-tools
 Source:         %{name}-%{version}.tar.xz
@@ -39,11 +40,13 @@ for use on systems with UEFI Secure Boot enabled.
 %prep
 %setup -q
 
+%build
+
 %install
 %make_install
 
 %post
-if test -d /sbin; then
+if ! test -L /sbin; then
 	ln -sf ../usr/sbin/installkernel /sbin/installkernel
 fi
 

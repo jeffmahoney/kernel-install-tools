@@ -89,6 +89,15 @@ while true; do
     shift
 done
 
+# It's typical for systems without UEFI to not have mokutil installed, so
+# check for UEFI variable support manually.  The user shouldn't need to
+# install mokutil only to discover it would fail anyway.
+if ! test -d /sys/firmware/efi/efivars; then
+    quiet_message "This system does not use UEFI Secure Boot functionality."
+    quiet_message "Exiting."
+    exit 0
+fi
+
 check_commands openssl mokutil
 
 CERT=$1

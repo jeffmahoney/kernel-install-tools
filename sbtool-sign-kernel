@@ -154,4 +154,4 @@ if $QUIET; then
     ARGS="-q"
 fi
 
-/sbin/enroll_secureboot_key $ARGS $CERT
+/usr/sbin/sbtool-enroll-key $ARGS $CERT

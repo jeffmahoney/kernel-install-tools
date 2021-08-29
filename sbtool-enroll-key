@@ -17,6 +17,44 @@ quiet_error() {
     exit 1
 }
 
+_usage() {
+cat <<END
+$progname [options] /path/to/certificate
+
+This script will copy the public component of the kernel signing key
+to /etc/uefi/certs and queue it for enrollment in the system MOK.
+
+If the certificate is already enrolled, it will be skipped.
+
+options:
+    -q|--quiet: do not report errors for missing dependencies, if the
+                certificate is already enrolled, or if it will be skipped
+    -h|--help: display this message
+END
+}
+
+help() {
+    _usage
+    exit 0
+}
+
+usage() {
+    _usage >&2
+    exit 1
+}
+
+check_commands() {
+    for command in "$@"; do
+        if ! command -v "$command" > /dev/null; then
+            if ! $QUIET; then
+                error "$command is missing"
+            else
+                exit 1
+            fi
+        fi
+    done
+}
+
 filter_fingerprints() {
     grep 'SHA1 Fingerprint' | sed -e 's/SHA1 Fingerprint.//' | \
         tr -d ' :' | tr a-z A-Z
@@ -31,7 +69,35 @@ enrolled_fingerprints() {
     mokutil --list-new | filter_fingerprints
 }
 
-if "$EUID" != 0; then
+options=$(getopt -o qh --long quiet,help -- "$@")
+eval set -- $options
+
+QUIET=false
+while true; do
+    case "$1" in
+    -q|--quiet)
+        QUIET=true ;;
+    -h|--help)
+        help ;;
+    --)
+        shift
+        break
+        ;;
+    *)
+        usage ;;
+    esac
+    shift
+done
+
+check_commands openssl mokutil
+
+CERT=$1
+
+if test -z "$CERT"; then
+    error "error: No certificate specified."
+fi
+
+if test "$EUID" != 0; then
     error "This tool must be run as root."
 fi
 
@@ -54,6 +120,7 @@ if test "$EUID" -ne 0; then
 fi
 
 mkdir -p /etc/uefi/certs
+# FIXME: Should handle collisions
 if ! openssl x509 -inform PEM -in "$CERT" -outform DER \
                   -out "/etc/uefi/certs/$fingerprint8.crt"; then
     error "Failed to convert ${CERT} to DER format for import."

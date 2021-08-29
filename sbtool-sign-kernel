@@ -129,9 +129,11 @@ read_cert_config() {
 }
 
 DETECTED_KEY=false
+FOUND_CONFIG=false
 if test -z "$CERT"; then
     for path in .config "$(dirname "$UNSIGNED")/.config"; do
         if test -e $path; then
+            FOUND_CONFIG=true
             CERT=$(read_cert_config $path)
             if test -n "$CERT"; then
                 DETECTED_KEY=true
@@ -139,9 +141,17 @@ if test -z "$CERT"; then
             fi
         fi
     done
+    if test -z "$CERT"; then
+        if $FOUND_CONFIG; then
+            quiet_message "Module signing not enabled for this kernel.  Skipping."
+            exit 0
+        else
+            error "Couldn't autodetect signing key, no config found."
+        fi
+    elif ! test -f "$CERT"; then
+        error "Certificate \"$CERT\" found in config but does not exist."
+    fi
 fi
-
-test -z "$CERT" && quiet_error "Couldn't locate signing key"
 
 cleanup() {
 	test -n "$tmpdir" && rm -rf "$tmpdir"

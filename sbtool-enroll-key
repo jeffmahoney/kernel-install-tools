@@ -24,7 +24,8 @@ $progname [options] /path/to/certificate
 This script will copy the public component of the kernel signing key
 to /etc/uefi/certs and queue it for enrollment in the system MOK.
 
-If the certificate is already enrolled, it will be skipped.
+If the certificate is already enrolled, it will be skipped and the script will exit with success.
+If the system does not support UEFI Secure Boot, it will be skipped and the script will exit with retval=2.
 
 options:
     -q|--quiet: do not report errors for missing dependencies, if the
@@ -95,7 +96,7 @@ done
 if ! test -d /sys/firmware/efi/efivars; then
     quiet_message "This system does not use UEFI Secure Boot functionality."
     quiet_message "Exiting."
-    exit 0
+    exit 2
 fi
 
 check_commands openssl mokutil

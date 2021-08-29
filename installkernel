@@ -80,7 +80,6 @@ kernel_needs_copy=true
 INSTALLED_KERNEL="$INSTALL_PATH/$BOOTFILE-$KERNEL_VERSION"
 if [ -x /usr/bin/sbtool-sign-kernel ]; then
     if /usr/bin/sbtool-sign-kernel -q -e $BOOTIMAGE $INSTALLED_KERNEL; then
-        echo "Signed $INSTALLED_KERNEL for Secure Boot"
         kernel_needs_copy=false
     fi
 fi

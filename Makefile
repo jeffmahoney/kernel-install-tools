@@ -9,3 +9,8 @@ install: $(SCRIPTS)
 		$(DESTDIR)/usr/bin/sbtool-sign-kernel
 	install -D -m 755 installkernel \
 		$(DESTDIR)/usr/sbin/installkernel
+	if ! test -L $(DESTDIR)/sbin; then \
+		mkdir -p $(DESTDIR)/sbin; \
+		ln -sf ../usr/sbin/installkernel \
+		       $(DESTDIR)/sbin/installkernel; \
+	fi

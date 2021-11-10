@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 #
 # /sbin/installkernel  - written by tyson@rwii.com
 #
@@ -100,7 +100,7 @@ if [ -x /sbin/depmod -a -d /lib/modules/$KERNEL_VERSION ]; then
     /sbin/depmod $KERNEL_VERSION
 fi
 
-function check_supported()
+check_supported()
 {
    local MOD_SUPP_FILE="/etc/modprobe.d/10-unsupported-modules.conf"
    local MOD_SUPP_REGEX="^\s*allow_unsupported_modules\s+0\s*$"

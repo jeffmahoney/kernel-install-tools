@@ -15,7 +15,6 @@
 # Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
 
-
 Name:           kernel-install-tools
 Version:        0.1
 Release:        0
@@ -25,10 +24,12 @@ License:        GPL-2.0
 URL:            https://github.com/jeffmahoney/kernel-install-tools
 Source:         %{name}-%{version}.tar.xz
 Requires:	openssl
+%ifarch ia64 %ix86 x86_64 aarch64 %arm riscv64
 Requires:	pesign
 Requires:	mozilla-nss-tools
-
-BuildArch:	noarch
+%else
+Requires:       kernel-default-devel
+%endif
 
 %description
 A collection of tools useful for installing self-built kernels.

@@ -62,11 +62,15 @@ usage() {
 check_commands() {
     for command in "$@"; do
         if ! command -v "$command" > /dev/null; then
-            if ! $QUIET; then
-                error "$command is missing"
-            else
-                exit 1
-            fi
+            for i in /usr/src/linux-obj/$(uname -m)/*/scripts/"$command" ; do
+                if [ -x "$i" ] ; then
+                    scriptdir="$(dirname "$i")"
+                    quiet_message "Using $command from $scriptdir"
+                    PATH="$PATH:$scriptdir"
+                    continue 2
+                fi
+            done
+            quiet_error "$command is missing"
         fi
     done
 }
@@ -119,7 +123,16 @@ while true; do
     shift
 done
 
-check_commands pesign pk12util certutil openssl
+arch="$(rpm -E %{_arch})"
+case "$arch" in
+    i?86|x86_64|aarch64|arm*|ia64|riscv64) sign_tools="pesign pk12util certutil" ;;
+    ppc*|s390*) sign_tools=sign-file ;;
+    *) echo "Don't know how to sign a kernel on architecture '$arch'."
+        exit 1
+        ;;
+esac
+
+check_commands $sign_tools openssl
 
 UNSIGNED=$1
 SIGNED=$2
@@ -189,10 +202,19 @@ certutil_import_key() {
     rm -f $tmpdir/passwd $P12 $tmpdir/output
 }
 
-certutil -N -d $tmpdir --empty-password
-certutil_import_key $tmpdir $CERT
+case "$sign_tools" in
+    pesign*)
+        certutil -N -d $tmpdir --empty-password
+        certutil_import_key $tmpdir $CERT
 
-pesign -n $tmpdir -c kernel-cert -i $UNSIGNED -o $SIGNED -s --force
+        pesign -n $tmpdir -c kernel-cert -i $UNSIGNED -o $SIGNED -s --force
+
+        ;;
+    sign-file)
+        openssl x509 -in $CERT -outform DER -out "$tmpdir/cert.crt"
+        sign-file sha256 $CERT $tmpdir/cert.crt $UNSIGNED $SIGNED
+        ;;
+esac
 
 echo "Signed $UNSIGNED with $CERT and installed to $SIGNED"
 

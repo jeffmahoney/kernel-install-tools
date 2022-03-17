@@ -148,7 +148,7 @@ esac
 # Generate initial ramdisk
 #
 if [ -x /usr/bin/dracut -a -d /lib/modules/$KERNEL_VERSION ]; then
-    /usr/bin/dracut --hostonly --force $CHECK_SUPPORTED \
+    /usr/bin/dracut --force $CHECK_SUPPORTED \
         $INSTALL_PATH/initrd-$KERNEL_VERSION $KERNEL_VERSION
 else
     echo "You may need to create an initial ramdisk now."

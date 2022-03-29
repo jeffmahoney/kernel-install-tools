@@ -23,6 +23,7 @@ Group:		Development/Tools/Other
 License:        GPL-2.0-only
 URL:            https://github.com/jeffmahoney/kernel-install-tools
 Source:         %{name}-%{version}.tar.xz
+Source1:	%{name}-rpmlintrc
 Requires:	openssl
 %ifarch ia64 %ix86 x86_64 aarch64 %arm riscv64
 Requires:	pesign

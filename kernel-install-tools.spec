@@ -20,7 +20,7 @@ Version:        0.1
 Release:        0
 Summary:	Useful tools for installing self-built kernels
 Group:		Development/Tools/Other
-License:        GPL-2.0
+License:        GPL-2.0-only
 URL:            https://github.com/jeffmahoney/kernel-install-tools
 Source:         %{name}-%{version}.tar.xz
 Requires:	openssl

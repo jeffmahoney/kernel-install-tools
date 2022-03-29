@@ -17,7 +17,7 @@
 
 
 Name:           kernel-install-tools
-Version:        0.2.13
+Version:        0.3
 Release:        0
 Summary:        Useful tools for installing self-built kernels
 Group:          Development/Tools/Other

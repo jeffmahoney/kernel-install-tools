@@ -1,7 +1,7 @@
 #
 # spec file for package kernel-install-tools
 #
-# Copyright (c) 2021 SUSE LLC
+# Copyright (c) 2022 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -15,19 +15,20 @@
 # Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
 
+
 Name:           kernel-install-tools
-Version:        0.1
+Version:        0.2.13
 Release:        0
-Summary:	Useful tools for installing self-built kernels
-Group:		Development/Tools/Other
+Summary:        Useful tools for installing self-built kernels
+Group:          Development/Tools/Other
 License:        GPL-2.0-only
 URL:            https://github.com/jeffmahoney/kernel-install-tools
 Source:         %{name}-%{version}.tar.xz
-Source1:	%{name}-rpmlintrc
-Requires:	openssl
+Source1:        %{name}-rpmlintrc
+Requires:       openssl
 %ifarch ia64 %ix86 x86_64 aarch64 %arm riscv64
-Requires:	pesign
-Requires:	mozilla-nss-tools
+Requires:       mozilla-nss-tools
+Requires:       pesign
 %else
 Requires:       kernel-default-devel
 %endif

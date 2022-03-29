@@ -47,10 +47,9 @@ for use on systems with UEFI Secure Boot enabled.
 %install
 %make_install
 
-%post
-if ! test -L /sbin; then
-	ln -sf ../usr/sbin/installkernel /sbin/installkernel
-fi
+%if 0%{?usrmerged}
+mv %{buildroot}/sbin/installkernel %{buildroot}/usr/sbin/installkernel
+%endif
 
 %files
 %license COPYING
@@ -58,7 +57,10 @@ fi
 %{_bindir}/sbtool-genkey
 %{_bindir}/sbtool-sign-kernel
 %{_sbindir}/sbtool-enroll-key
+%if 0%{?usrmerged}
 %{_sbindir}/installkernel
-%ghost /sbin/installkernel
+%else
+/sbin/installkernel
+%endif
 
 %changelog
